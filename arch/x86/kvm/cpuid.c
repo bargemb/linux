@@ -1038,9 +1038,11 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 EXPORT_SYMBOL_GPL(kvm_cpuid);
 
 atomic_t exit_count = ATOMIC_INIT(0);
+atomic64_t cpu_cycle_count = ATOMIC_INIT(0);
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
 	u32 eax, ebx, ecx, edx;
+	uint64_t low, high;
 
 	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
 		return 1;
@@ -1050,7 +1052,14 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 	switch (eax) {
 	case 0x4FFFFFFF:
 		eax = atomic_read(&exit_count);
-		printk("Hello World");
+		printk("Exit Count");
+		break;
+	case 0x4FFFFFFE:
+		low = atomic64_read(&cpu_cycle_count);
+		high = atomic64_read(&cpu_cycle_count);
+		printk("CPU Cycle Count");
+		ebx = high >> 32;
+		ecx = low & 0xFFFFFFFF;
 		break;
 	default:
 		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
@@ -1063,3 +1072,4 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
 EXPORT_SYMBOL(exit_count);
+EXPORT_SYMBOL(cpu_cycle_count);
