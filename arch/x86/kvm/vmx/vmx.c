@@ -5854,6 +5854,7 @@ void dump_vmcs(void)
 		       vmcs_read16(VIRTUAL_PROCESSOR_ID));
 }
 
+extern atomic_t exit_count;
 /*
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
@@ -5864,6 +5865,7 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	u32 exit_reason = vmx->exit_reason;
 	u32 vectoring_info = vmx->idt_vectoring_info;
 
+	atomic_inc(&exit_count);
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
 
 	/*
