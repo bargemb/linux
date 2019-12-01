@@ -1037,8 +1037,33 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 }
 EXPORT_SYMBOL_GPL(kvm_cpuid);
 
+bool is_defined_sdm(u32 exit_type)
+{
+	bool is_valid = true;
+	if (
+		exit_type < 0 || exit_type > 68 ||
+		exit_type == 35 || exit_type == 38 || exit_type == 42 || exit_type == 65
+	)
+		is_valid = false;
+	return is_valid;
+}
+
+bool is_enabled_kvm(u32 exit_type)
+{
+	bool is_valid = true;
+	if (
+		exit_type == 3 || exit_type == 4 || exit_type == 5 || exit_type == 6 || exit_type == 11 ||
+		exit_type == 16 || exit_type == 17 || exit_type == 33 || exit_type == 34 || exit_type == 51 ||
+		exit_type == 63 || exit_type == 64 || exit_type == 66 || exit_type == 67 || exit_type == 68
+	)
+		is_valid = false;
+	return is_valid;
+}
+
 atomic_t exit_count = ATOMIC_INIT(0);
 atomic64_t cpu_cycle_count = ATOMIC_INIT(0);
+atomic_t exit_count_per_type[69] = {ATOMIC_INIT(0)};
+atomic64_t cpu_cycle_count_per_type[69] = {ATOMIC_INIT(0)};
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
 	u32 eax, ebx, ecx, edx;
@@ -1052,15 +1077,40 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 	switch (eax) {
 	case 0x4FFFFFFF:
 		eax = atomic_read(&exit_count);
-		printk("Exit Count");
+		ebx = ecx = edx = 0xF;
 		break;
 	case 0x4FFFFFFE:
 		low = atomic64_read(&cpu_cycle_count);
 		high = atomic64_read(&cpu_cycle_count);
-		printk("CPU Cycle Count");
 		ebx = high >> 32;
 		ecx = low & 0xFFFFFFFF;
+		eax = edx = 0xE;
 		break;
+	case 0x4FFFFFFD:
+		if (!is_defined_sdm(ecx)) {
+			eax = ebx = ecx = 0;
+			edx = 0xFFFFFFFF;
+		} else if (!is_enabled_kvm(ecx)) {
+			eax = ebx = ecx = edx = 0;
+		} else {
+			eax = atomic_read(&exit_count_per_type[ecx]);
+			ebx = ecx = edx = 0xD;
+		}
+		break;
+	case 0x4FFFFFFC:
+		if (!is_defined_sdm(ecx)) {
+                        eax = ebx = ecx = 0;
+                        edx = 0xFFFFFFFF;
+                } else if (!is_enabled_kvm(ecx)) {
+                        eax = ebx = ecx = edx = 0;
+                } else {
+			low = atomic64_read(&cpu_cycle_count_per_type[ecx]);
+			high = atomic64_read(&cpu_cycle_count_per_type[ecx]);
+			ebx = high >> 32;
+			ecx = low & 0xFFFFFFFF;
+			eax = edx = 0xC;
+                }
+                break;
 	default:
 		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 	}
@@ -1073,3 +1123,5 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
 EXPORT_SYMBOL(exit_count);
 EXPORT_SYMBOL(cpu_cycle_count);
+EXPORT_SYMBOL(exit_count_per_type);
+EXPORT_SYMBOL(cpu_cycle_count_per_type);

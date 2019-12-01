@@ -5850,6 +5850,8 @@ void dump_vmcs(void)
 
 extern atomic_t exit_count;
 extern atomic64_t cpu_cycle_count;
+extern atomic_t exit_count_per_type[69];
+extern atomic64_t cpu_cycle_count_per_type[69];
 /*
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
@@ -5948,6 +5950,8 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		uint64_t end_time = rdtsc();
 		uint64_t delta = end_time - start_time;
 		atomic64_add(delta, &cpu_cycle_count);
+		atomic_inc(&exit_count_per_type[exit_reason]);
+		atomic64_add(delta, &cpu_cycle_count_per_type[exit_reason]);
 		return ret;
 	} else {
 		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
